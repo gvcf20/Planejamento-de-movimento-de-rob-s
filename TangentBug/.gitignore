@@ -1,0 +1,13 @@
+# Arquivos de algoritmos criados pelo usuário
+algorithms/*
+!algorithms/bug0.py
+!algorithms/bfs.py
+!algorithms/a_estrela.py
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
