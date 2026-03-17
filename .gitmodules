@@ -1,0 +1,3 @@
+[submodule "TangentBug"]
+	path = TangentBug
+	url = git@github.com:gvcf20/TangentBug.git
