@@ -1,0 +1,1589 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TangentBug – Planejamento de Movimento de Robôs</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs/loader.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked@4.3.0/marked.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: #0f172a;
+      color: #e2e8f0;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* ── Header ─────────────────────────────────────────── */
+    #header {
+      background: #1e293b;
+      border-bottom: 1px solid #334155;
+      padding: 8px 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-shrink: 0;
+    }
+    #header h1 { font-size: 1.1rem; color: #38bdf8; font-weight: 700; }
+    #header span { font-size: 0.8rem; color: #94a3b8; }
+
+    /* ── Toolbar ─────────────────────────────────────────── */
+    #toolbar {
+      background: #1e293b;
+      border-bottom: 1px solid #334155;
+      padding: 6px 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      flex-shrink: 0;
+    }
+    .tb-sep { width: 1px; height: 24px; background: #334155; }
+    .tb-label { font-size: 0.7rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; }
+
+    .mode-btn {
+      padding: 4px 10px;
+      font-size: 0.78rem;
+      border: 1px solid #475569;
+      border-radius: 5px;
+      background: #1e293b;
+      color: #cbd5e1;
+      cursor: pointer;
+      transition: all 0.15s;
+      white-space: nowrap;
+    }
+    .mode-btn:hover { background: #334155; color: #f1f5f9; }
+    .mode-btn.active {
+      background: #0ea5e9;
+      border-color: #0ea5e9;
+      color: #fff;
+      font-weight: 600;
+    }
+    .mode-btn.start-active  { background: #16a34a; border-color: #16a34a; color: #fff; font-weight: 600; }
+    .mode-btn.goal-active   { background: #dc2626; border-color: #dc2626; color: #fff; font-weight: 600; }
+    .mode-btn.erase-active  { background: #b45309; border-color: #b45309; color: #fff; font-weight: 600; }
+
+    .action-btn {
+      padding: 4px 12px;
+      font-size: 0.78rem;
+      border: 1px solid #475569;
+      border-radius: 5px;
+      background: #1e293b;
+      color: #cbd5e1;
+      cursor: pointer;
+      transition: all 0.15s;
+      white-space: nowrap;
+    }
+    .action-btn:hover { background: #334155; }
+    .action-btn.primary { background: #0ea5e9; border-color: #0ea5e9; color: #fff; font-weight: 600; }
+    .action-btn.primary:hover { background: #0284c7; }
+    .action-btn.danger  { color: #fca5a5; border-color: #7f1d1d; }
+    .action-btn.danger:hover { background: #7f1d1d; }
+    .action-btn:disabled { opacity: 0.4; cursor: default; }
+
+    #speed-group {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.75rem;
+      color: #94a3b8;
+    }
+    #speed-slider { width: 80px; accent-color: #0ea5e9; }
+
+    /* ── Main layout ─────────────────────────────────────── */
+    #main {
+      flex: 1;
+      display: flex;
+      overflow: hidden;
+    }
+
+    /* ── Canvas panel ────────────────────────────────────── */
+    #canvas-panel {
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+      border-right: 1px solid #334155;
+    }
+    #canvas-scroll {
+      flex: 1;
+      overflow: auto;
+      background: #0f172a;
+    }
+    #canvas-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
+    #canvas-scroll::-webkit-scrollbar-track { background: #1e293b; }
+    #canvas-scroll::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
+    #grid-canvas {
+      display: block;
+      cursor: crosshair;
+      image-rendering: pixelated;
+    }
+    #status-bar {
+      background: #1e293b;
+      border-top: 1px solid #334155;
+      padding: 3px 10px;
+      display: flex;
+      gap: 16px;
+      font-size: 0.72rem;
+      color: #94a3b8;
+      flex-shrink: 0;
+    }
+    #status-hint { color: #38bdf8; }
+
+    /* ── Editor panel ────────────────────────────────────── */
+    #editor-panel {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-width: 380px;
+      overflow: hidden;
+    }
+    #editor-header {
+      background: #1e293b;
+      border-bottom: 1px solid #334155;
+      padding: 6px 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: #94a3b8;
+      flex-shrink: 0;
+    }
+    .small-btn {
+      padding: 2px 8px;
+      font-size: 0.72rem;
+      border: 1px solid #475569;
+      border-radius: 4px;
+      background: #0f172a;
+      color: #94a3b8;
+      cursor: pointer;
+      margin-left: 4px;
+    }
+    .small-btn:hover { background: #334155; color: #e2e8f0; }
+
+    #monaco-editor {
+      flex: 1;
+      min-height: 0;
+    }
+
+    /* ── Metrics ─────────────────────────────────────────── */
+    #metrics-panel {
+      flex-shrink: 0;
+      background: #1e293b;
+      border-top: 1px solid #334155;
+      max-height: 230px;
+      overflow-y: auto;
+    }
+    #metrics-panel::-webkit-scrollbar { width: 5px; }
+    #metrics-panel::-webkit-scrollbar-thumb { background: #475569; }
+
+    #metrics-header {
+      padding: 5px 12px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #64748b;
+      border-bottom: 1px solid #334155;
+    }
+    #metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1px;
+      background: #334155;
+      border-bottom: 1px solid #334155;
+    }
+    .metric-card {
+      background: #1e293b;
+      padding: 6px 10px;
+      text-align: center;
+    }
+    .metric-card .val { font-size: 1.1rem; font-weight: 700; color: #38bdf8; }
+    .metric-card .lbl { font-size: 0.65rem; color: #64748b; margin-top: 1px; }
+    .metric-card .val.ok   { color: #4ade80; }
+    .metric-card .val.fail { color: #f87171; }
+
+    #warnings-list { padding: 4px 10px; }
+    .warning-item {
+      font-size: 0.73rem;
+      color: #fbbf24;
+      padding: 1px 0;
+    }
+    .warning-item::before { content: "⚠ "; }
+
+    #output-section, #error-section {
+      border-top: 1px solid #334155;
+      padding: 4px 10px;
+    }
+    .section-lbl {
+      font-size: 0.65rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #64748b;
+      margin-bottom: 2px;
+    }
+    pre#output-text {
+      font-size: 0.72rem;
+      color: #94a3b8;
+      white-space: pre-wrap;
+      word-break: break-all;
+      max-height: 60px;
+      overflow-y: auto;
+    }
+    pre#error-text {
+      font-size: 0.72rem;
+      color: #fca5a5;
+      white-space: pre-wrap;
+      word-break: break-all;
+      max-height: 80px;
+      overflow-y: auto;
+    }
+
+    /* ── Polygon cursor ──────────────────────────────────── */
+    .cursor-poly { cursor: cell !important; }
+
+    /* ── File bar ────────────────────────────────────────── */
+    #editor-header { flex-direction: column; padding: 0; gap: 0; }
+    #file-bar {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      padding: 5px 10px;
+      border-bottom: 1px solid #334155;
+      flex-wrap: wrap;
+    }
+    #file-select {
+      flex: 1;
+      min-width: 120px;
+      max-width: 220px;
+      background: #0f172a;
+      color: #e2e8f0;
+      border: 1px solid #475569;
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-size: 0.78rem;
+    }
+    #file-select option { background: #1e293b; }
+    #file-status {
+      font-size: 0.72rem;
+      margin-left: 4px;
+      min-width: 70px;
+    }
+    #file-status.saved    { color: #4ade80; }
+    #file-status.modified { color: #fbbf24; }
+    #example-bar {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 10px;
+      flex-wrap: wrap;
+    }
+    #example-bar span { font-size: 0.7rem; color: #64748b; }
+
+    /* ── Help modal ──────────────────────────────────────── */
+    #help-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.7);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+    }
+    #help-overlay.open { display: flex; }
+    #help-box {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      width: min(860px, 94vw);
+      height: min(90vh, 820px);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    #help-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 16px;
+      border-bottom: 1px solid #334155;
+      flex-shrink: 0;
+    }
+    #help-top span { font-size: 0.85rem; font-weight: 700; color: #38bdf8; }
+    #help-close {
+      background: none;
+      border: none;
+      color: #94a3b8;
+      font-size: 1.2rem;
+      cursor: pointer;
+      line-height: 1;
+    }
+    #help-close:hover { color: #f1f5f9; }
+    #help-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px 24px;
+      font-size: 0.84rem;
+      line-height: 1.7;
+      color: #cbd5e1;
+    }
+    #help-body::-webkit-scrollbar { width: 6px; }
+    #help-body::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
+    /* Markdown rendered styles */
+    #help-body h1 { font-size: 1.3rem; color: #38bdf8; margin-bottom: 12px; }
+    #help-body h2 { font-size: 1.05rem; color: #7dd3fc; margin: 20px 0 8px; border-bottom: 1px solid #334155; padding-bottom: 4px; }
+    #help-body h3 { font-size: 0.92rem; color: #93c5fd; margin: 14px 0 6px; }
+    #help-body p  { margin-bottom: 8px; }
+    #help-body ul, #help-body ol { margin: 6px 0 8px 20px; }
+    #help-body li { margin-bottom: 3px; }
+    #help-body code {
+      background: #0f172a;
+      color: #86efac;
+      padding: 1px 5px;
+      border-radius: 3px;
+      font-family: 'Cascadia Code', 'Fira Code', monospace;
+      font-size: 0.82rem;
+    }
+    #help-body pre {
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 6px;
+      padding: 12px 14px;
+      overflow-x: auto;
+      margin: 8px 0;
+    }
+    #help-body pre code { background: none; padding: 0; color: #a5f3fc; }
+    #help-body table {
+      border-collapse: collapse;
+      width: 100%;
+      margin: 8px 0;
+      font-size: 0.8rem;
+    }
+    #help-body th { background: #0f172a; color: #7dd3fc; font-weight: 600; }
+    #help-body th, #help-body td { border: 1px solid #334155; padding: 5px 10px; }
+    #help-body tr:nth-child(even) td { background: #162032; }
+    #help-body blockquote {
+      border-left: 3px solid #0ea5e9;
+      padding: 4px 12px;
+      color: #94a3b8;
+      margin: 6px 0;
+    }
+    #help-body strong { color: #e2e8f0; }
+    #help-loading { text-align: center; padding: 40px; color: #64748b; }
+  </style>
+</head>
+<body>
+
+<div id="header">
+  <h1>TangentBug</h1>
+  <span>Planejamento de Movimento de Robôs — PPGEE/UFMG</span>
+</div>
+
+<div id="toolbar">
+  <span class="tb-label">Modo</span>
+  <button class="mode-btn active" data-mode="select">Selecionar</button>
+  <button class="mode-btn" data-mode="start"     id="btn-start">Início&nbsp;🟢</button>
+  <button class="mode-btn" data-mode="goal"      id="btn-goal">Chegada&nbsp;🔴</button>
+  <button class="mode-btn" data-mode="rect">Retângulo</button>
+  <button class="mode-btn" data-mode="circle">Círculo</button>
+  <button class="mode-btn" data-mode="polygon">Polígono</button>
+  <button class="mode-btn" data-mode="erase">Apagar</button>
+
+  <div class="tb-sep"></div>
+  <button class="action-btn" id="clear-obs-btn">Limpar Obstáculos</button>
+  <button class="action-btn danger" id="clear-all-btn">Limpar Tudo</button>
+
+  <div class="tb-sep"></div>
+  <div id="speed-group">
+    <span>Vel.</span>
+    <input type="range" id="speed-slider" min="1" max="60" value="15" />
+    <span id="speed-val">15</span>
+  </div>
+
+  <div class="tb-sep"></div>
+  <button class="action-btn primary" id="run-btn">▶ Executar</button>
+  <button class="action-btn" id="stop-btn" disabled>⏹ Parar</button>
+
+  <div class="tb-sep"></div>
+  <button class="action-btn" id="help-btn">📖 Guia</button>
+</div>
+
+<!-- ── Help modal ───────────────────────────────────────────── -->
+<div id="help-overlay">
+  <div id="help-box">
+    <div id="help-top">
+      <span>📖 Guia de Desenvolvimento de Algoritmos</span>
+      <button id="help-close">✕</button>
+    </div>
+    <div id="help-body"><div id="help-loading">Carregando documentação…</div></div>
+  </div>
+</div>
+
+<div id="main">
+  <div id="canvas-panel">
+    <div id="canvas-scroll">
+      <canvas id="grid-canvas"></canvas>
+    </div>
+    <div id="status-bar">
+      <span id="st-cell">Célula: —</span>
+      <span id="st-mode">Modo: Selecionar</span>
+      <span id="st-hint"></span>
+    </div>
+  </div>
+
+  <div id="editor-panel">
+    <div id="editor-header">
+
+      <!-- Linha 1: gerenciador de arquivos -->
+      <div id="file-bar">
+        <select id="file-select" title="Selecionar arquivo">
+          <option value="">— Selecionar arquivo —</option>
+        </select>
+        <button class="small-btn" id="save-btn"   title="Salvar arquivo atual (Ctrl+S)">💾 Salvar</button>
+        <button class="small-btn" id="new-btn"    title="Criar novo arquivo">＋ Novo</button>
+        <button class="small-btn" id="rename-btn" title="Renomear arquivo atual">✏ Renomear</button>
+        <button class="small-btn" id="del-btn"    title="Excluir arquivo atual" style="color:#fca5a5">🗑 Excluir</button>
+        <span id="file-status"></span>
+      </div>
+
+      <!-- Linha 2: exemplos rápidos -->
+      <div id="example-bar">
+        <span>Carregar exemplo:</span>
+        <button class="small-btn" id="load-bfs">BFS</button>
+        <button class="small-btn" id="load-astar">A*</button>
+        <button class="small-btn" id="load-tangent">TangentBug</button>
+      </div>
+
+    </div>
+    <div id="monaco-editor"></div>
+
+    <div id="metrics-panel">
+      <div id="metrics-header">Resultados da Última Execução</div>
+      <div id="metrics-grid">
+        <div class="metric-card"><div class="val" id="m-time">—</div><div class="lbl">Tempo (ms)</div></div>
+        <div class="metric-card"><div class="val" id="m-steps">—</div><div class="lbl">Passos</div></div>
+        <div class="metric-card"><div class="val" id="m-dist">—</div><div class="lbl">Distância</div></div>
+        <div class="metric-card"><div class="val" id="m-reached">—</div><div class="lbl">Chegou?</div></div>
+      </div>
+      <div id="warnings-list"></div>
+      <div id="output-section" style="display:none">
+        <div class="section-lbl">Saída (print)</div>
+        <pre id="output-text"></pre>
+      </div>
+      <div id="error-section" style="display:none">
+        <div class="section-lbl">Erro</div>
+        <pre id="error-text"></pre>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+// CONSTANTS
+// ═══════════════════════════════════════════════════════════
+const COLS = 40;
+const ROWS = 30;
+const CELL = 20;
+
+// Colors
+const C = {
+  bg:       '#f8fafc',
+  gridLine: '#e2e8f0',
+  obstacle: '#475569',
+  obstLine: '#334155',
+  start:    '#16a34a',
+  goal:     '#dc2626',
+  path:     '#ea580c',
+  pathLine: '#fb923c',
+  robot:    '#2563eb',
+  hover:    'rgba(14,165,233,0.15)',
+  dragPrev: 'rgba(71,85,105,0.45)',
+  dragBord: 'rgba(71,85,105,0.9)',
+  polyPt:   '#0ea5e9',
+};
+
+// ═══════════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════════
+const S = {
+  mode: 'select',
+  start: null,          // {col, row}
+  goal:  null,          // {col, row}
+  obstacles: [],        // [{type, ...}]
+  path: [],             // [[col,row], ...]
+  robotIdx: -1,         // current animation index
+
+  // drag
+  dragging: false,
+  dragA: null,          // {col, row} – start of drag (grid)
+  dragB: null,          // {col, row} – current drag (grid)
+
+  // polygon building
+  polyPts: [],          // [{col, row}]
+
+  // animation
+  animating: false,
+  animTimer: null,
+
+  // hover
+  hover: null,          // {col, row}
+};
+
+// ═══════════════════════════════════════════════════════════
+// CANVAS SETUP
+// ═══════════════════════════════════════════════════════════
+const canvas = document.getElementById('grid-canvas');
+const ctx    = canvas.getContext('2d');
+canvas.width  = COLS * CELL;
+canvas.height = ROWS * CELL;
+
+// ═══════════════════════════════════════════════════════════
+// COORDINATE HELPERS
+// ═══════════════════════════════════════════════════════════
+function canvasPos(e) {
+  const r = canvas.getBoundingClientRect();
+  return { px: e.clientX - r.left, py: e.clientY - r.top };
+}
+function snapGrid(px, py) {
+  return { col: Math.floor(px / CELL), row: Math.floor(py / CELL) };
+}
+function inBounds(col, row) {
+  return col >= 0 && col < COLS && row >= 0 && row < ROWS;
+}
+function cellCenter(col, row) {
+  return { x: col * CELL + CELL / 2, y: row * CELL + CELL / 2 };
+}
+
+// ═══════════════════════════════════════════════════════════
+// GEOMETRY UTILS
+// ═══════════════════════════════════════════════════════════
+function pointInPolygon(px, py, pts) {
+  let inside = false;
+  for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+    const xi = pts[i].col, yi = pts[i].row;
+    const xj = pts[j].col, yj = pts[j].row;
+    if (((yi > py) !== (yj > py)) && (px < (xj - xi) * (py - yi) / (yj - yi) + xi))
+      inside = !inside;
+  }
+  return inside;
+}
+
+// ═══════════════════════════════════════════════════════════
+// BUILD BINARY GRID FROM OBSTACLES
+// ═══════════════════════════════════════════════════════════
+function buildGrid() {
+  const g = Array.from({ length: ROWS }, () => new Array(COLS).fill(0));
+  for (const obs of S.obstacles) {
+    if (obs.type === 'rect') {
+      const c0 = Math.max(0, obs.col),       r0 = Math.max(0, obs.row);
+      const c1 = Math.min(COLS, obs.col + obs.cols);
+      const r1 = Math.min(ROWS, obs.row + obs.rows);
+      for (let r = r0; r < r1; r++)
+        for (let c = c0; c < c1; c++)
+          g[r][c] = 1;
+    } else if (obs.type === 'circle') {
+      const r2 = obs.radius * obs.radius;
+      for (let r = 0; r < ROWS; r++)
+        for (let c = 0; c < COLS; c++) {
+          const dx = (c + 0.5) - obs.cx, dy = (r + 0.5) - obs.cy;
+          if (dx * dx + dy * dy <= r2) g[r][c] = 1;
+        }
+    } else if (obs.type === 'polygon' && obs.pts.length >= 3) {
+      const minC = Math.max(0,    Math.floor(Math.min(...obs.pts.map(p => p.col))));
+      const maxC = Math.min(COLS, Math.ceil (Math.max(...obs.pts.map(p => p.col))));
+      const minR = Math.max(0,    Math.floor(Math.min(...obs.pts.map(p => p.row))));
+      const maxR = Math.min(ROWS, Math.ceil (Math.max(...obs.pts.map(p => p.row))));
+      for (let r = minR; r < maxR; r++)
+        for (let c = minC; c < maxC; c++)
+          if (pointInPolygon(c + 0.5, r + 0.5, obs.pts)) g[r][c] = 1;
+    }
+  }
+  return g;
+}
+
+// ═══════════════════════════════════════════════════════════
+// OBSTACLE HIT TEST (for erase)
+// ═══════════════════════════════════════════════════════════
+function obsHit(obs, col, row) {
+  if (obs.type === 'rect')
+    return col >= obs.col && col < obs.col + obs.cols &&
+           row >= obs.row && row < obs.row + obs.rows;
+  if (obs.type === 'circle') {
+    const dx = (col + 0.5) - obs.cx, dy = (row + 0.5) - obs.cy;
+    return dx * dx + dy * dy <= obs.radius * obs.radius;
+  }
+  if (obs.type === 'polygon')
+    return pointInPolygon(col + 0.5, row + 0.5, obs.pts);
+  return false;
+}
+
+// ═══════════════════════════════════════════════════════════
+// RENDERING
+// ═══════════════════════════════════════════════════════════
+function render() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  drawBackground();
+  drawGridLines();
+  drawObstacles();
+  drawPath();
+  drawHover();
+  drawDragPreview();
+  drawPolyPreview();
+  drawMarkers();
+  drawRobot();
+}
+
+function drawBackground() {
+  ctx.fillStyle = C.bg;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+}
+
+function drawGridLines() {
+  ctx.strokeStyle = C.gridLine;
+  ctx.lineWidth = 0.5;
+  for (let c = 0; c <= COLS; c++) {
+    ctx.beginPath();
+    ctx.moveTo(c * CELL, 0);
+    ctx.lineTo(c * CELL, canvas.height);
+    ctx.stroke();
+  }
+  for (let r = 0; r <= ROWS; r++) {
+    ctx.beginPath();
+    ctx.moveTo(0, r * CELL);
+    ctx.lineTo(canvas.width, r * CELL);
+    ctx.stroke();
+  }
+}
+
+function drawObstacles() {
+  for (const obs of S.obstacles) {
+    ctx.fillStyle   = C.obstacle;
+    ctx.strokeStyle = C.obstLine;
+    ctx.lineWidth   = 1;
+    drawObsShape(obs);
+    ctx.fill();
+    ctx.stroke();
+  }
+}
+
+function drawObsShape(obs) {
+  ctx.beginPath();
+  if (obs.type === 'rect') {
+    ctx.rect(obs.col * CELL, obs.row * CELL, obs.cols * CELL, obs.rows * CELL);
+  } else if (obs.type === 'circle') {
+    ctx.arc(obs.cx * CELL, obs.cy * CELL, obs.radius * CELL, 0, Math.PI * 2);
+  } else if (obs.type === 'polygon' && obs.pts.length >= 2) {
+    ctx.moveTo(obs.pts[0].col * CELL, obs.pts[0].row * CELL);
+    for (let i = 1; i < obs.pts.length; i++)
+      ctx.lineTo(obs.pts[i].col * CELL, obs.pts[i].row * CELL);
+    ctx.closePath();
+  }
+}
+
+function drawPath() {
+  if (S.path.length < 2) return;
+  ctx.strokeStyle = C.pathLine;
+  ctx.lineWidth   = 2;
+  ctx.setLineDash([]);
+  ctx.beginPath();
+  ctx.moveTo(S.path[0][0] * CELL + CELL / 2, S.path[0][1] * CELL + CELL / 2);
+  for (let i = 1; i < S.path.length; i++)
+    ctx.lineTo(S.path[i][0] * CELL + CELL / 2, S.path[i][1] * CELL + CELL / 2);
+  ctx.stroke();
+  // dots
+  ctx.fillStyle = C.path;
+  for (const [pc, pr] of S.path) {
+    ctx.beginPath();
+    ctx.arc(pc * CELL + CELL / 2, pr * CELL + CELL / 2, 2.5, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+function drawHover() {
+  if (!S.hover || S.mode === 'select') return;
+  const { col, row } = S.hover;
+  if (!inBounds(col, row)) return;
+  ctx.fillStyle = C.hover;
+  ctx.fillRect(col * CELL, row * CELL, CELL, CELL);
+}
+
+function drawDragPreview() {
+  if (!S.dragging || !S.dragA || !S.dragB) return;
+  ctx.fillStyle   = C.dragPrev;
+  ctx.strokeStyle = C.dragBord;
+  ctx.lineWidth   = 1.5;
+  ctx.setLineDash([4, 3]);
+
+  if (S.mode === 'rect') {
+    const [c0, c1] = minMax(S.dragA.col, S.dragB.col);
+    const [r0, r1] = minMax(S.dragA.row, S.dragB.row);
+    ctx.beginPath();
+    ctx.rect(c0 * CELL, r0 * CELL, (c1 - c0 + 1) * CELL, (r1 - r0 + 1) * CELL);
+    ctx.fill(); ctx.stroke();
+  } else if (S.mode === 'circle') {
+    const dx = S.dragB.col - S.dragA.col;
+    const dy = S.dragB.row - S.dragA.row;
+    const r  = Math.sqrt(dx * dx + dy * dy);
+    ctx.beginPath();
+    ctx.arc((S.dragA.col + 0.5) * CELL, (S.dragA.row + 0.5) * CELL, r * CELL, 0, Math.PI * 2);
+    ctx.fill(); ctx.stroke();
+  }
+  ctx.setLineDash([]);
+}
+
+function drawPolyPreview() {
+  const pts = S.polyPts;
+  if (pts.length === 0) return;
+
+  ctx.strokeStyle = C.dragBord;
+  ctx.fillStyle   = C.dragPrev;
+  ctx.lineWidth   = 1.5;
+  ctx.setLineDash([4, 3]);
+
+  ctx.beginPath();
+  ctx.moveTo(pts[0].col * CELL, pts[0].row * CELL);
+  for (let i = 1; i < pts.length; i++)
+    ctx.lineTo(pts[i].col * CELL, pts[i].row * CELL);
+  if (S.hover)
+    ctx.lineTo(S.hover.col * CELL, S.hover.row * CELL);
+  if (pts.length >= 3) {
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // vertices
+  ctx.fillStyle = C.polyPt;
+  for (const p of pts) {
+    ctx.beginPath();
+    ctx.arc(p.col * CELL, p.row * CELL, 4, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  // first vertex ring (close hint)
+  if (pts.length >= 3) {
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(pts[0].col * CELL, pts[0].row * CELL, 6, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+}
+
+function drawMarkers() {
+  if (S.start) drawMarker(S.start.col, S.start.row, C.start,  'I');
+  if (S.goal)  drawMarker(S.goal.col,  S.goal.row,  C.goal,   'C');
+}
+
+function drawMarker(col, row, color, label) {
+  const cx = col * CELL + CELL / 2, cy = row * CELL + CELL / 2;
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.arc(cx, cy, CELL * 0.42, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#fff';
+  ctx.font = `bold ${CELL * 0.55}px sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(label, cx, cy);
+}
+
+function drawRobot() {
+  let pos;
+  if (S.animating && S.robotIdx >= 0 && S.robotIdx < S.path.length) {
+    pos = { col: S.path[S.robotIdx][0], row: S.path[S.robotIdx][1] };
+  } else if (!S.animating && S.start) {
+    pos = S.start;
+  }
+  if (!pos) return;
+  const cx = pos.col * CELL + CELL / 2, cy = pos.row * CELL + CELL / 2;
+  // shadow
+  ctx.fillStyle = 'rgba(37,99,235,0.25)';
+  ctx.beginPath();
+  ctx.arc(cx, cy, CELL * 0.48, 0, Math.PI * 2);
+  ctx.fill();
+  // body
+  ctx.fillStyle = C.robot;
+  ctx.beginPath();
+  ctx.arc(cx, cy, CELL * 0.38, 0, Math.PI * 2);
+  ctx.fill();
+  // label
+  ctx.fillStyle = '#fff';
+  ctx.font = `bold ${CELL * 0.42}px sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('R', cx, cy);
+}
+
+function minMax(a, b) { return a <= b ? [a, b] : [b, a]; }
+
+// ═══════════════════════════════════════════════════════════
+// MOUSE INTERACTION
+// ═══════════════════════════════════════════════════════════
+canvas.addEventListener('mousedown', onDown);
+canvas.addEventListener('mousemove', onMove);
+canvas.addEventListener('mouseup',   onUp);
+canvas.addEventListener('mouseleave', () => { S.hover = null; render(); });
+
+function onDown(e) {
+  if (e.button !== 0) return;
+  const { px, py } = canvasPos(e);
+  const cell = snapGrid(px, py);
+  if (!inBounds(cell.col, cell.row)) return;
+
+  switch (S.mode) {
+    case 'start':
+      S.start = cell;
+      S.path = [];
+      stopAnimation();
+      render();
+      break;
+
+    case 'goal':
+      S.goal = cell;
+      S.path = [];
+      stopAnimation();
+      render();
+      break;
+
+    case 'rect':
+    case 'circle':
+      S.dragging = true;
+      S.dragA = cell;
+      S.dragB = cell;
+      break;
+
+    case 'polygon': {
+      // Close polygon if clicking near first point
+      if (S.polyPts.length >= 3) {
+        const fp = S.polyPts[0];
+        const dist = Math.hypot(cell.col - fp.col, cell.row - fp.row);
+        if (dist <= 1.5) {
+          commitPolygon();
+          return;
+        }
+      }
+      S.polyPts.push({ col: cell.col, row: cell.row });
+      render();
+      break;
+    }
+
+    case 'erase':
+      eraseAt(cell.col, cell.row);
+      S.dragging = true;
+      render();
+      break;
+  }
+}
+
+function onMove(e) {
+  const { px, py } = canvasPos(e);
+  const cell = snapGrid(px, py);
+  S.hover = cell;
+
+  if (S.dragging) {
+    S.dragB = cell;
+    if (S.mode === 'erase') eraseAt(cell.col, cell.row);
+  }
+  render();
+}
+
+function onUp(e) {
+  if (!S.dragging) return;
+  const { px, py } = canvasPos(e);
+  const cell = snapGrid(px, py);
+  S.dragB = cell;
+
+  if (S.mode === 'rect') {
+    const [c0, c1] = minMax(S.dragA.col, S.dragB.col);
+    const [r0, r1] = minMax(S.dragA.row, S.dragB.row);
+    S.obstacles.push({ type: 'rect', col: c0, row: r0, cols: c1 - c0 + 1, rows: r1 - r0 + 1 });
+    S.path = [];
+  } else if (S.mode === 'circle') {
+    const dx = S.dragB.col - S.dragA.col;
+    const dy = S.dragB.row - S.dragA.row;
+    const r  = Math.sqrt(dx * dx + dy * dy);
+    if (r > 0.3)
+      S.obstacles.push({ type: 'circle', cx: S.dragA.col + 0.5, cy: S.dragA.row + 0.5, radius: r });
+    S.path = [];
+  }
+
+  S.dragging = false;
+  S.dragA = null;
+  S.dragB = null;
+  render();
+}
+
+// Double-click to close polygon
+canvas.addEventListener('dblclick', () => {
+  if (S.mode === 'polygon' && S.polyPts.length >= 3) commitPolygon();
+});
+
+// Keyboard: Enter to close polygon, Escape to cancel
+document.addEventListener('keydown', e => {
+  if (S.mode === 'polygon') {
+    if (e.key === 'Enter' && S.polyPts.length >= 3) { commitPolygon(); return; }
+    if (e.key === 'Escape') { S.polyPts = []; render(); }
+  }
+});
+
+function commitPolygon() {
+  if (S.polyPts.length >= 3) {
+    S.obstacles.push({ type: 'polygon', pts: [...S.polyPts] });
+    S.path = [];
+  }
+  S.polyPts = [];
+  render();
+}
+
+function eraseAt(col, row) {
+  const before = S.obstacles.length;
+  S.obstacles = S.obstacles.filter(o => !obsHit(o, col, row));
+  if (S.obstacles.length !== before) S.path = [];
+}
+
+// ═══════════════════════════════════════════════════════════
+// MODE SWITCHING
+// ═══════════════════════════════════════════════════════════
+const modeHints = {
+  select:  'Nenhuma ação ao clicar',
+  start:   'Clique para definir o ponto de partida',
+  goal:    'Clique para definir o ponto de chegada',
+  rect:    'Arraste para desenhar um retângulo de obstáculo',
+  circle:  'Arraste do centro para a borda para criar um círculo',
+  polygon: 'Clique para adicionar vértices • Enter / duplo-clique para fechar • Esc para cancelar',
+  erase:   'Clique e arraste para apagar obstáculos',
+};
+const modeActiveClass = {
+  start: 'start-active', goal: 'goal-active', erase: 'erase-active',
+};
+
+document.querySelectorAll('.mode-btn').forEach(btn => {
+  btn.addEventListener('click', () => setMode(btn.dataset.mode));
+});
+
+function setMode(m) {
+  // cancel in-progress polygon when switching
+  if (S.mode === 'polygon') S.polyPts = [];
+  S.mode = m;
+
+  document.querySelectorAll('.mode-btn').forEach(b => {
+    b.classList.remove('active', 'start-active', 'goal-active', 'erase-active');
+    if (b.dataset.mode === m) {
+      b.classList.add(modeActiveClass[m] || 'active');
+    }
+  });
+
+  const cursors = { rect: 'crosshair', circle: 'crosshair', polygon: 'cell',
+                    erase: 'cell', start: 'crosshair', goal: 'crosshair', select: 'default' };
+  canvas.style.cursor = cursors[m] || 'default';
+  document.getElementById('st-mode').textContent = `Modo: ${m}`;
+  document.getElementById('st-hint').textContent  = modeHints[m] || '';
+  render();
+}
+
+// ═══════════════════════════════════════════════════════════
+// CLEAR BUTTONS
+// ═══════════════════════════════════════════════════════════
+document.getElementById('clear-obs-btn').addEventListener('click', () => {
+  S.obstacles = [];
+  S.path = [];
+  stopAnimation();
+  render();
+});
+
+document.getElementById('clear-all-btn').addEventListener('click', () => {
+  S.obstacles = [];
+  S.start  = null;
+  S.goal   = null;
+  S.path   = [];
+  S.polyPts = [];
+  stopAnimation();
+  resetMetrics();
+  render();
+});
+
+// ═══════════════════════════════════════════════════════════
+// ANIMATION
+// ═══════════════════════════════════════════════════════════
+function startAnimation(path) {
+  stopAnimation();
+  if (!path || path.length === 0) return;
+  S.path      = path;
+  S.robotIdx  = 0;
+  S.animating = true;
+  document.getElementById('run-btn').disabled  = true;
+  document.getElementById('stop-btn').disabled = false;
+  tickAnim();
+}
+
+function tickAnim() {
+  render();
+  if (S.robotIdx >= S.path.length - 1) {
+    stopAnimation(true);
+    return;
+  }
+  const fps = parseInt(document.getElementById('speed-slider').value, 10);
+  S.animTimer = setTimeout(() => {
+    S.robotIdx++;
+    tickAnim();
+  }, 1000 / fps);
+}
+
+function stopAnimation(finished = false) {
+  clearTimeout(S.animTimer);
+  S.animating = false;
+  S.animTimer = null;
+  if (!finished) S.robotIdx = -1;
+  document.getElementById('run-btn').disabled  = false;
+  document.getElementById('stop-btn').disabled = true;
+  render();
+}
+
+document.getElementById('stop-btn').addEventListener('click', () => stopAnimation());
+
+// Speed display
+document.getElementById('speed-slider').addEventListener('input', function () {
+  document.getElementById('speed-val').textContent = this.value;
+});
+
+// ═══════════════════════════════════════════════════════════
+// STATUS – hover cell
+// ═══════════════════════════════════════════════════════════
+canvas.addEventListener('mousemove', e => {
+  const { px, py } = canvasPos(e);
+  const cell = snapGrid(px, py);
+  if (inBounds(cell.col, cell.row))
+    document.getElementById('st-cell').textContent = `Célula: (${cell.col}, ${cell.row})`;
+  else
+    document.getElementById('st-cell').textContent = 'Célula: —';
+});
+
+// ═══════════════════════════════════════════════════════════
+// RUN ALGORITHM
+// ═══════════════════════════════════════════════════════════
+document.getElementById('run-btn').addEventListener('click', runAlgorithm);
+
+async function runAlgorithm() {
+  if (!S.start || !S.goal) {
+    showError('Defina os pontos de Início 🟢 e Chegada 🔴 antes de executar.');
+    return;
+  }
+  const code = window.monacoEditor ? window.monacoEditor.getValue() : '';
+  const grid = buildGrid();
+
+  document.getElementById('run-btn').disabled = true;
+  clearResults();
+
+  let resp;
+  try {
+    resp = await fetch('/run', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        code,
+        grid,
+        start: [S.start.col, S.start.row],
+        goal:  [S.goal.col,  S.goal.row],
+      }),
+    });
+  } catch (err) {
+    showError(`Erro de conexão: ${err.message}`);
+    document.getElementById('run-btn').disabled = false;
+    return;
+  }
+
+  const data = await resp.json();
+  document.getElementById('run-btn').disabled = false;
+
+  if (!resp.ok) {
+    showError(data.error || 'Erro desconhecido');
+    if (data.output) showOutput(data.output);
+    return;
+  }
+
+  showMetrics(data.metrics);
+  showWarnings(data.warnings);
+  if (data.output) showOutput(data.output);
+  startAnimation(data.path);
+}
+
+// ═══════════════════════════════════════════════════════════
+// METRICS / OUTPUT UI
+// ═══════════════════════════════════════════════════════════
+function clearResults() {
+  ['m-time','m-steps','m-dist','m-reached'].forEach(id => {
+    const el = document.getElementById(id);
+    el.textContent = '—';
+    el.className   = 'val';
+  });
+  document.getElementById('warnings-list').innerHTML = '';
+  document.getElementById('output-section').style.display  = 'none';
+  document.getElementById('error-section').style.display   = 'none';
+}
+
+function resetMetrics() { clearResults(); }
+
+function showMetrics(m) {
+  document.getElementById('m-time').textContent  = m.tempo_ms;
+  document.getElementById('m-steps').textContent = m.passos;
+  document.getElementById('m-dist').textContent  = m.distancia;
+  const reached = document.getElementById('m-reached');
+  reached.textContent = m.chegou ? 'Sim' : 'Não';
+  reached.className   = 'val ' + (m.chegou ? 'ok' : 'fail');
+}
+
+function showWarnings(warns) {
+  const el = document.getElementById('warnings-list');
+  el.innerHTML = '';
+  for (const w of (warns || [])) {
+    const d = document.createElement('div');
+    d.className   = 'warning-item';
+    d.textContent = w;
+    el.appendChild(d);
+  }
+}
+
+function showOutput(text) {
+  document.getElementById('output-text').textContent = text;
+  document.getElementById('output-section').style.display = '';
+}
+
+function showError(msg) {
+  document.getElementById('error-text').textContent = msg;
+  document.getElementById('error-section').style.display = '';
+}
+
+// ═══════════════════════════════════════════════════════════
+// DEFAULT CODE EXAMPLES
+// ═══════════════════════════════════════════════════════════
+const BFS_CODE = `from collections import deque
+
+def plan(grid, start, goal):
+    """
+    Busca em Largura (BFS) — garante caminho mínimo em número de passos.
+
+    Parâmetros
+    ----------
+    grid  : list[list[int]]   grade 2D: 0 = livre, 1 = obstáculo
+                               grid[linha][coluna]
+    start : tuple[int, int]   posição inicial (coluna, linha)
+    goal  : tuple[int, int]   posição destino  (coluna, linha)
+
+    Retorno
+    -------
+    list[tuple[int,int]]  sequência de posições do início ao destino,
+                          ou lista vazia se não houver caminho.
+    """
+    rows, cols = len(grid), len(grid[0])
+
+    if grid[start[1]][start[0]] or grid[goal[1]][goal[0]]:
+        return []
+
+    # 8 direções de movimento
+    dirs = [(1,0),(-1,0),(0,1),(0,-1),(1,1),(1,-1),(-1,1),(-1,-1)]
+
+    queue   = deque([(start, [start])])
+    visited = {start}
+
+    while queue:
+        (col, row), path = queue.popleft()
+        if (col, row) == goal:
+            return path
+        for dc, dr in dirs:
+            nc, nr = col + dc, row + dr
+            pos = (nc, nr)
+            if 0 <= nc < cols and 0 <= nr < rows \\
+               and grid[nr][nc] == 0 and pos not in visited:
+                visited.add(pos)
+                queue.append((pos, path + [pos]))
+
+    return []
+`;
+
+const ASTAR_CODE = `import heapq
+import math
+
+def plan(grid, start, goal):
+    """
+    Algoritmo A* com heurística Euclidiana.
+    """
+    rows, cols = len(grid), len(grid[0])
+
+    if grid[start[1]][start[0]] or grid[goal[1]][goal[0]]:
+        return []
+
+    dirs = [(1,0),(-1,0),(0,1),(0,-1),(1,1),(1,-1),(-1,1),(-1,-1)]
+
+    def h(pos):
+        return math.hypot(pos[0] - goal[0], pos[1] - goal[1])
+
+    # heap: (f, g, pos, path)
+    heap    = [(h(start), 0, start, [start])]
+    visited = {}   # pos -> g_cost
+
+    while heap:
+        f, g, (col, row), path = heapq.heappop(heap)
+
+        if (col, row) == goal:
+            return path
+
+        if visited.get((col, row), float('inf')) <= g:
+            continue
+        visited[(col, row)] = g
+
+        for dc, dr in dirs:
+            nc, nr = col + dc, row + dr
+            pos = (nc, nr)
+            if not (0 <= nc < cols and 0 <= nr < rows) or grid[nr][nc]:
+                continue
+            ng = g + math.hypot(dc, dr)
+            if ng < visited.get(pos, float('inf')):
+                heapq.heappush(heap, (ng + h(pos), ng, pos, path + [pos]))
+
+    return []
+`;
+
+const TANGENT_CODE = `import math
+
+# ──────────────────────────────────────────────────────
+#  TangentBug  (versão simplificada)
+#
+#  Estratégia:
+#   1. Move-se em linha reta ao destino.
+#   2. Ao colidir com um obstáculo, percorre o contorno
+#      até encontrar um ponto "tangente" do qual seja
+#      possível retomar a rota ao destino sem colisão.
+#
+#  Referência: Kamon, Rimon & Rivlin (1998).
+# ──────────────────────────────────────────────────────
+
+def plan(grid, start, goal):
+    rows, cols = len(grid), len(grid[0])
+
+    def free(c, r):
+        return 0 <= c < cols and 0 <= r < rows and grid[r][c] == 0
+
+    def neighbors8(c, r):
+        dirs = [(1,0),(-1,0),(0,1),(0,-1),(1,1),(1,-1),(-1,1),(-1,-1)]
+        return [(c+dc, r+dr) for dc,dr in dirs if free(c+dc, r+dr)]
+
+    def line_free(a, b):
+        """Verifica se o segmento de a até b não passa por obstáculos (aprox.)."""
+        c0, r0 = a; c1, r1 = b
+        steps = max(abs(c1-c0), abs(r1-r0)) * 4 + 1
+        for i in range(steps + 1):
+            t  = i / steps
+            c  = round(c0 + (c1 - c0) * t)
+            r  = round(r0 + (r1 - r0) * t)
+            if not free(c, r):
+                return False
+        return True
+
+    def bfs_contour(pos, goal, max_steps=2000):
+        """
+        Percorre o contorno do obstáculo (BFS limitado) buscando
+        o ponto de menor distância ao goal com linha livre.
+        """
+        from collections import deque
+        queue   = deque([(pos, [pos])])
+        visited = {pos}
+        best    = None
+        best_d  = float('inf')
+
+        while queue:
+            (c, r), path = queue.popleft()
+            if len(path) > max_steps:
+                break
+            d = math.hypot(c - goal[0], r - goal[1])
+            if d < best_d and line_free((c, r), goal):
+                best_d = d
+                best   = path
+
+            for nc, nr in neighbors8(c, r):
+                if (nc, nr) not in visited:
+                    visited.add((nc, nr))
+                    queue.append(((nc, nr), path + [(nc, nr)]))
+
+        return best or [pos]
+
+    # ── Main loop ──
+    path    = [start]
+    pos     = start
+    visited = {start}
+    MAX_IT  = rows * cols * 2
+
+    for _ in range(MAX_IT):
+        if pos == goal:
+            break
+
+        # Tenta mover em linha reta ao goal
+        if line_free(pos, goal):
+            # Caminha passo a passo até o goal
+            c, r = pos
+            gc, gr = goal
+            steps = max(abs(gc-c), abs(gr-r))
+            for s in range(1, steps + 1):
+                t  = s / steps
+                nc = round(c + (gc - c) * t)
+                nr = round(r + (gr - r) * t)
+                if (nc, nr) not in visited:
+                    visited.add((nc, nr))
+                    path.append((nc, nr))
+            pos = goal
+            break
+
+        # Linha bloqueada: contorna o obstáculo
+        contour = bfs_contour(pos, goal)
+        for p in contour[1:]:
+            if p not in visited:
+                visited.add(p)
+                path.append(p)
+        pos = path[-1]
+
+    return path
+`;
+
+// ═══════════════════════════════════════════════════════════
+// LOAD EXAMPLE BUTTONS (inline snippets)
+// ═══════════════════════════════════════════════════════════
+document.getElementById('load-bfs').addEventListener('click', () => {
+  if (window.monacoEditor) { window.monacoEditor.setValue(BFS_CODE); markModified(); }
+});
+document.getElementById('load-astar').addEventListener('click', () => {
+  if (window.monacoEditor) { window.monacoEditor.setValue(ASTAR_CODE); markModified(); }
+});
+document.getElementById('load-tangent').addEventListener('click', () => {
+  if (window.monacoEditor) { window.monacoEditor.setValue(TANGENT_CODE); markModified(); }
+});
+
+// ═══════════════════════════════════════════════════════════
+// FILE MANAGER
+// ═══════════════════════════════════════════════════════════
+let currentFile    = null;   // filename currently loaded
+let savedContent   = '';     // content at last save/load
+
+const fileSelect = document.getElementById('file-select');
+const fileStatus = document.getElementById('file-status');
+
+function markSaved(filename) {
+  currentFile  = filename;
+  savedContent = window.monacoEditor ? window.monacoEditor.getValue() : '';
+  fileStatus.textContent = '● Salvo';
+  fileStatus.className   = 'saved';
+  // sync select
+  fileSelect.value = filename;
+}
+
+function markModified() {
+  if (!currentFile) return;
+  const cur = window.monacoEditor ? window.monacoEditor.getValue() : '';
+  if (cur !== savedContent) {
+    fileStatus.textContent = '● Modificado';
+    fileStatus.className   = 'modified';
+  }
+}
+
+async function loadFileList() {
+  const resp  = await fetch('/files');
+  const data  = await resp.json();
+  const cur   = fileSelect.value;
+  // keep the placeholder option, rebuild the rest
+  fileSelect.innerHTML = '<option value="">— Selecionar arquivo —</option>';
+  for (const f of data.files) {
+    const opt   = document.createElement('option');
+    opt.value   = f;
+    opt.textContent = f;
+    fileSelect.appendChild(opt);
+  }
+  if (cur && data.files.includes(cur)) fileSelect.value = cur;
+}
+
+fileSelect.addEventListener('change', async () => {
+  const name = fileSelect.value;
+  if (!name) return;
+  if (currentFile && fileStatus.className === 'modified') {
+    if (!confirm(`"${currentFile}" tem alterações não salvas. Deseja descartar?`)) {
+      fileSelect.value = currentFile;
+      return;
+    }
+  }
+  const resp = await fetch(`/files/${encodeURIComponent(name)}`);
+  if (!resp.ok) { alert('Erro ao carregar arquivo.'); return; }
+  const data = await resp.json();
+  if (window.monacoEditor) window.monacoEditor.setValue(data.content);
+  markSaved(name);
+});
+
+document.getElementById('save-btn').addEventListener('click', async () => {
+  if (!currentFile) {
+    // no file selected → act as "save as"
+    await saveAsNewFile();
+    return;
+  }
+  const content = window.monacoEditor ? window.monacoEditor.getValue() : '';
+  const resp    = await fetch(`/files/${encodeURIComponent(currentFile)}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ content }),
+  });
+  if (resp.ok) { markSaved(currentFile); }
+  else         { const d = await resp.json(); alert('Erro: ' + d.error); }
+});
+
+document.getElementById('new-btn').addEventListener('click', saveAsNewFile);
+
+async function saveAsNewFile() {
+  let name = prompt('Nome do arquivo (ex: meu_algoritmo.py):');
+  if (!name) return;
+  name = name.trim();
+  if (!name.endsWith('.py')) name += '.py';
+  if (!/^[\w\-. ]+\.py$/.test(name)) {
+    alert('Nome inválido. Use apenas letras, números, hífens e underscores.');
+    return;
+  }
+  const content = window.monacoEditor ? window.monacoEditor.getValue() : '';
+  const resp    = await fetch(`/files/${encodeURIComponent(name)}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ content }),
+  });
+  if (!resp.ok) { const d = await resp.json(); alert('Erro: ' + d.error); return; }
+  await loadFileList();
+  markSaved(name);
+}
+
+document.getElementById('rename-btn').addEventListener('click', async () => {
+  if (!currentFile) { alert('Nenhum arquivo selecionado.'); return; }
+  let newName = prompt(`Renomear "${currentFile}" para:`, currentFile);
+  if (!newName || newName === currentFile) return;
+  newName = newName.trim();
+  if (!newName.endsWith('.py')) newName += '.py';
+  // save content under new name
+  const content = window.monacoEditor ? window.monacoEditor.getValue() : '';
+  const saveResp = await fetch(`/files/${encodeURIComponent(newName)}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ content }),
+  });
+  if (!saveResp.ok) { const d = await saveResp.json(); alert('Erro: ' + d.error); return; }
+  // delete old
+  await fetch(`/files/${encodeURIComponent(currentFile)}`, { method: 'DELETE' });
+  await loadFileList();
+  markSaved(newName);
+});
+
+document.getElementById('del-btn').addEventListener('click', async () => {
+  if (!currentFile) { alert('Nenhum arquivo selecionado.'); return; }
+  if (!confirm(`Excluir "${currentFile}" permanentemente?`)) return;
+  const resp = await fetch(`/files/${encodeURIComponent(currentFile)}`, { method: 'DELETE' });
+  if (!resp.ok) { const d = await resp.json(); alert('Erro: ' + d.error); return; }
+  currentFile  = null;
+  savedContent = '';
+  fileStatus.textContent = '';
+  fileStatus.className   = '';
+  await loadFileList();
+  fileSelect.value = '';
+});
+
+// Track modifications in editor
+function setupEditorChangeListener() {
+  if (!window.monacoEditor) { setTimeout(setupEditorChangeListener, 300); return; }
+  window.monacoEditor.onDidChangeModelContent(markModified);
+  // Ctrl+S → save
+  window.monacoEditor.addCommand(
+    monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS,
+    () => document.getElementById('save-btn').click()
+  );
+}
+
+// ═══════════════════════════════════════════════════════════
+// HELP MODAL
+// ═══════════════════════════════════════════════════════════
+let docsLoaded = false;
+
+document.getElementById('help-btn').addEventListener('click', openHelp);
+document.getElementById('help-close').addEventListener('click', closeHelp);
+document.getElementById('help-overlay').addEventListener('click', e => {
+  if (e.target === document.getElementById('help-overlay')) closeHelp();
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && document.getElementById('help-overlay').classList.contains('open'))
+    closeHelp();
+});
+
+function openHelp() {
+  document.getElementById('help-overlay').classList.add('open');
+  if (!docsLoaded) fetchDocs();
+}
+function closeHelp() {
+  document.getElementById('help-overlay').classList.remove('open');
+}
+
+async function fetchDocs() {
+  try {
+    const resp = await fetch('/docs/guia.md');
+    const text = await resp.text();
+    // marked v4: marked.parse(); marked v2-v3: marked() or marked.parse()
+    const html = (typeof marked !== 'undefined')
+      ? (marked.parse ? marked.parse(text) : marked(text))
+      : text.replace(/</g, '&lt;').replace(/\n/g, '<br>');
+    document.getElementById('help-body').innerHTML = html;
+    docsLoaded = true;
+  } catch (err) {
+    document.getElementById('help-body').innerHTML =
+      `<p style="color:#f87171">Erro ao carregar documentação: ${err.message}</p>`;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// MONACO EDITOR INIT
+// ═══════════════════════════════════════════════════════════
+require.config({
+  paths: { vs: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs' }
+});
+require(['vs/editor/editor.main'], function () {
+  window.monacoEditor = monaco.editor.create(document.getElementById('monaco-editor'), {
+    value:                BFS_CODE,
+    language:             'python',
+    theme:                'vs-dark',
+    fontSize:             13,
+    lineHeight:           20,
+    minimap:              { enabled: false },
+    scrollBeyondLastLine: false,
+    automaticLayout:      true,
+    wordWrap:             'off',
+    renderLineHighlight:  'line',
+    tabSize:              4,
+    insertSpaces:         true,
+  });
+
+  // Ctrl+Enter → run
+  window.monacoEditor.addCommand(
+    monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter,
+    runAlgorithm
+  );
+  // Ctrl+S → save (also wired in setupEditorChangeListener, but set here too)
+  window.monacoEditor.addCommand(
+    monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS,
+    () => document.getElementById('save-btn').click()
+  );
+  window.monacoEditor.onDidChangeModelContent(markModified);
+});
+
+// ═══════════════════════════════════════════════════════════
+// INITIAL RENDER + STARTUP
+// ═══════════════════════════════════════════════════════════
+render();
+setMode('select');
+loadFileList();
+</script>
+</body>
+</html>
